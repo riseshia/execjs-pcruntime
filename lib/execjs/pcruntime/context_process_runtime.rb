@@ -9,23 +9,35 @@ require 'net/http'
 module ExecJS
   module PCRuntime
     # override ExecJS::Runtime
+    # XXX: To be precise, It is just subclass of ExecJS::Runtime, isn't it?
+    #      ExecJS::Runtime is just abstract base class(quoted self explanation from https://github.com/rails/execjs/blob/master/lib/execjs/runtime.rb),
+    #      hence overriding might not proper expression.
     class ContextProcessRuntime < Runtime
       # override ExecJS::Runtime::Context
+      # XXX: Same here.
       class Context < Runtime::Context
         # @param [String] runtime Instance of ContextProcessRuntime
         # @param [String] source JavaScript source code that Runtime load at startup
         # @param [any] options
         def initialize(runtime, source = '', options = {})
+          # XXX: `initialize` of Context class is just empty and not like to be
+          #      added something in the future, so it might be skipped.
           super(runtime, source, options)
 
+          # XXX: In my understanding, Context instance is always created when call Runtime#{exec,eval}.
+          #      Ref: https://github.com/rails/execjs/blob/f49db2167accbc1b8ec117e12dd397ed8a5a2534/lib/execjs/runtime.rb#L64-L70
+          #      If it's right, this impl creates nodejs process per every exec, eval call,
+          #      Is this intended? or am I missed something?
           # @type [JSRuntimeHandle]
           @runtime = runtime.create_runtime_handle
 
-          # load initial source to Context
+          # XXX: Could you explain this init evaluation?
+          #      Base on Runtime default compile method, which always evaluate empty string.
+          #      Ref: https://github.com/rails/execjs/blob/f49db2167accbc1b8ec117e12dd397ed8a5a2534/lib/execjs/runtime.rb#L64-L70
           @runtime.evaluate(source.encode('UTF-8'))
         end
 
-        # override ExecJS::Runtime::Context#eval
+        # override ExecJS::Runtime::Context#eval XXX: this comment not needed, or another explanation is better such as "Impl eval..."
         # @param [String] source
         # @param [any] _options
         def eval(source, _options = {})
@@ -34,14 +46,14 @@ module ExecJS
           @runtime.evaluate("(#{source.encode('UTF-8')})")
         end
 
-        # override ExecJS::Runtime::Context#exec
+        # override ExecJS::Runtime::Context#exec XXX: this comment not needed, or another explanation is better such as ~~
         # @param [String] source
         # @param [any] _options
         def exec(source, _options = {})
           @runtime.evaluate("(()=>{#{source.encode('UTF-8')}})()")
         end
 
-        # override ExecJS::Runtime:Context#call
+        # override ExecJS::Runtime:Context#call XXX: this comment not needed, or another explanation is better such as ~~
         # @param [String] identifier
         # @param [Array<_ToJson>] args
         def call(identifier, *args)
@@ -55,6 +67,7 @@ module ExecJS
         # @param [Array<String>] binary Launch command for the node(or similar JavaScript Runtime) binary,
         #     such as ['node'], ['deno', 'run'].
         # @param [String] initial_source Path of .js Runtime loads at startup.
+        # XXX: How about rename  initial_source to initial_source_path?
         def initialize(binary, initial_source)
           Dir::Tmpname.create 'execjs_pcruntime' do |path|
             # Dir::Tmpname.create rescues Errno::EEXIST and retry block
@@ -192,6 +205,7 @@ module ExecJS
       # @param [Array<String>] command candidates for JavaScript Runtime commands such as ['deno run', 'node']
       # @param [String] runner_path path of the .js file to run in the Runtime
       def initialize(name, command, runner_path = File.expand_path('runner.js', __dir__), deprecated: false)
+        # XXX: Runtime class doesn't have initialize method, so it might be skipped.
         super()
         @name = name
         @command = command
@@ -202,6 +216,8 @@ module ExecJS
 
       # override ExecJS::Runtime#available?
       def available?
+        # XXX: Do we need this here? We already loaded 'json' on L5.
+        #      Reference impl(might be ExternalRuntime?) has this, but It seems useless clearly.
         require 'json'
         binary ? true : false
       end
@@ -243,11 +259,14 @@ module ExecJS
       # It seems that further method splitting might actually make it harder to read, so suppressing
       # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
       def search_executable_path(command)
+        # XXX: is there any reason to set extensions, path as instance variable?
         @extensions ||= ExecJS.windows? ? ENV['PATHEXT'].split(File::PATH_SEPARATOR) + [''] : ['']
         @path ||= ENV['PATH'].split(File::PATH_SEPARATOR) + ['']
         @path.each do |base_path|
           @extensions.each do |extension|
             executable_path = base_path == '' ? command + extension : File.join(base_path, command + extension)
+            # XXX: `File.executable?` checks file existance, so File.exist? can be skipped.
+            # ReF: https://docs.ruby-lang.org/ja/latest/method/File/s/executable=3f.html
             return executable_path if File.executable?(executable_path) && File.exist?(executable_path)
           end
         end
@@ -255,8 +274,13 @@ module ExecJS
       end
       # rubocop:enable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
 
+      # XXX: (maybe) Which method is works strictly, however, command String passed to
+      #      this method are fully under control, split(/\s+/) might be enough.
+      #
       # Split command string
       #   split_command_string "deno run" # ["deno", "run"]
+      # XXX: might be clear with this?
+      #   split_command_string "deno run" => ["deno", "run"]
       # @param [String] command command string
       # @return [Array<String>] array split from the command string
       def split_command_string(command)

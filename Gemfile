@@ -7,6 +7,7 @@ git_source(:github) { |repo_name| "https://github.com/#{repo_name}" }
 # Specify your gem's dependencies in execjs-pcruntime.gemspec
 gemspec
 
+# XXX: This gem require execjs for execution, so why don't we specify this on gemspec?
 gem 'execjs', '~> 2.0'
 
 group :development do
